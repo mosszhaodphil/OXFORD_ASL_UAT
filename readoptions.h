@@ -154,7 +154,7 @@ help(string("-h,--help"), false,
       false,requires_argument),
 
     // Partial volume (linear regression) options
-    pvfile(string("--pv"), string(""), string("Partial volume map"),
+    pvfile(string("--pvmap"), string(""), string("Partial volume map (GM, WM, or CSF)"),
       false, requires_argument),
 
     kernel(string("--kernel"), 5, string("Kernel size of partial volume correction. Default: 5"),
