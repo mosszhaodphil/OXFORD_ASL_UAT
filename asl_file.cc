@@ -218,12 +218,17 @@ int main(int argc, char *argv[])
       // Partial volume correction on each TI
       if(opts.pvfile.set()) {
 
-        cout << "Performing partial volume correction: linear regression kernel size " << endl;
-
-        // function to perform partial volume correction by linear regression
-        pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
-
-        save_volume4D(data_pvcorr, pvout_file_name);
+        // Check mask file is specified
+        if(opts.maskfile.set()) {
+          cout << "Start partial volume correction" << endl;
+          // function to perform partial volume correction by linear regression
+          pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
+          save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
       }
 
     //do epochwise output

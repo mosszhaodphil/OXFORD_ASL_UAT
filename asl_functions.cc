@@ -421,6 +421,7 @@ namespace OXASL {
   // function to perform partial volume correction by linear regression
   void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
 
+    // Clone input data to pv corrected data
     data_pvcorr = data_in;
 
     // Correct NaN and INF numbers of input mask and pvmap
@@ -429,19 +430,16 @@ namespace OXASL {
     mask_in_corr   = correct_NaN(mask);
     pv_map_in_corr = correct_NaN(pv_map);
 
-    // Split the data_in file across time
     // Do correction on each slice of time series
-    // Merge the corrected file
-
     for(int i = 0; i < ndata_in; i++) {
-      // split the file
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
       volume<float> corrected_data_ti = correct_NaN(data_in[i]);
 
       // Linear regression PV correction
       data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
+      cout << ".";
     }
-
-    cout << "PV function done" << endl;
+    cout << endl;
   }
 
   // Function to correct PV using LR method
