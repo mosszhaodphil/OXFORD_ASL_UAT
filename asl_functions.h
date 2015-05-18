@@ -50,7 +50,7 @@ namespace OXASL {
   ReturnMatrix convmtx(const ColumnVector& invec);
 
   // function to perform partial volume correction by linear regression
-  void pvcorr_LR(data, mask, pvmap, kernel, data_pvcorr);
+  void pvcorr_LR(const volume4D<float>& data, const volume<float>& mask, const volume<float>& pvmap, int kernel, const volume4D<float>& data_pvcorr);
 }
 
 #endif

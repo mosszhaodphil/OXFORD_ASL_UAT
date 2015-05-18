@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
     kernel = opts.kernel.value(); // default kernel size is 5
     volume4D<float> data_pvcorr; // partial volume corrected data
     string pvout_file_name; // partial volume corrected output file name
-    pvout_file_name = opts.pvout_file.value());
+    pvout_file_name = opts.pvout_file.value();
 
 
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
