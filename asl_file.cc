@@ -202,21 +202,13 @@ int main(int argc, char *argv[])
     
       //split data into separate file for each TI
       if (opts.splitout.set()) {
-	splitout(asldataout,mask,opts.splitout.value()+fsub);
-	/*cout << "Splitting ASL data into files for each TI" << endl;
-	  volume4D<float> blockout;
-	  for (int n=0; n<ntis; n++) 
-	  {
-	  char cstr [5];
-	  if (n<10) sprintf(cstr,"00%d",n);
-	  else if (n<100) sprintf(cstr,"0%d",n);
-	  else if (n<1000) sprintf(cstr,"%d",n);
-	  else throw Exception("More than 1000 measurements in this ASL data file, sorry cannot handle this operation");
-	  string tino(cstr);
-	  
-	  blockout.setmatrix(asldata[n],mask);
-	  save_volume4D(blockout,opts.splitout.value()+tino);
-	  }*/
+        splitout(asldataout,mask,opts.splitout.value()+fsub);
+      }
+
+      // Partial volume correction on each TI
+      if(opts.pvfile.set()) {
+
+        cout << "Partial volume correction" << endl;
       }
 
     //do epochwise output
