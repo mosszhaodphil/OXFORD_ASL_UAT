@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
         cout << "Performing partial volume correction: linear regression kernel size " << endl;
 
         // function to perform partial volume correction by linear regression
-        pvcorr_LR(data, mask, pvmap, kernel, data_pvcorr);
+        pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
 
         //save_volume4D(data_pvcorr, pvout_file_name);
       }

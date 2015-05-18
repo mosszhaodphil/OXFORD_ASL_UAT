@@ -438,10 +438,10 @@ namespace OXASL {
       volume<float> corrected_data_ti = correct_NaN(data_in[i]);
 
       // Linear regression PV correction
-      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel)
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
     }
 
-    cout << "PV function" << endl;
+    cout << "PV function done" << endl;
   }
 
   // Function to correct PV using LR method

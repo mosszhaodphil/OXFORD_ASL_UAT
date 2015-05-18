@@ -56,7 +56,7 @@ namespace OXASL {
   volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel);
 
   // Function to correct NaN values
-  volume<float> correct_NaN(const volume<float>& data_in)
+  volume<float> correct_NaN(const volume<float>& data_in);
 }
 
 #endif
