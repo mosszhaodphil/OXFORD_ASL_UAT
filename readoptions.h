@@ -150,7 +150,7 @@ help(string("-h,--help"), false,
       string("Deconvolution of data with arterial input functions"),
       false,requires_argument),
     aif(string("--aif"),string(""),
-      string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)"),
+      string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)\n"),
       false,requires_argument),
 
     // Partial volume (linear regression) options
