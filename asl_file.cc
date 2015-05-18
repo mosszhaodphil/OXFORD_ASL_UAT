@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
         // function to perform partial volume correction by linear regression
         pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
 
-        //save_volume4D(data_pvcorr, pvout_file_name);
+        save_volume4D(data_pvcorr, pvout_file_name);
       }
 
     //do epochwise output
