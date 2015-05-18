@@ -58,6 +58,7 @@ public:
   // Partial volume correction (linear regression method) parameters
   Option<string> pvfile;
   Option<int> kernel;
+  Option<string> pvout_file;
 
   void parse_command_line(int argc, char** argv);
 
@@ -156,9 +157,11 @@ help(string("-h,--help"), false,
     // Partial volume (linear regression) options
     pvfile(string("--pvmap"), string(""), string("Partial volume map (GM, WM, or CSF)"),
       false, requires_argument),
-
     kernel(string("--kernel"), 5, string("Kernel size of partial volume correction. Default: 5"),
       false, requires_argument),
+    pvout_file(string("--pvout"), string("pvout"), string("Partial volume output file name. Default: pv_output"),
+      fause, requires_argument),
+
 
 
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
@@ -192,6 +195,7 @@ help(string("-h,--help"), false,
 
        options.add(pvfile);
        options.add(kernel);
+       options.add(pvout_file);
 
      }
 

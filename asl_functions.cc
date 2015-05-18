@@ -418,6 +418,12 @@ namespace OXASL {
     save_volume4D(magout,fname+"_magntiude");
   }
 
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(data, mask, pvmap, kernel, data_pvcorr) {
+
+    cout << "PV function" << endl;
+  }
+
 
 
 }

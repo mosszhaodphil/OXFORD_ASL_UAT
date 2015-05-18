@@ -72,6 +72,16 @@ int main(int argc, char *argv[])
     else throw Exception("Unrecognised output asl form");
     */
 
+    // Partail volume correction variables
+    volume<float> pvmap;
+    read_volume(pvmap, opts.pvfile.value());
+    int kernel;
+    kernel = opts.kernel.value(); // default kernel size is 5
+    volume4D<float> data_pvcorr; // partial volume corrected data
+    string pvout_file_name; // partial volume corrected output file name
+    pvout_file_name = opts.pvout_file.value());
+
+
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
 
     //load data
@@ -208,7 +218,12 @@ int main(int argc, char *argv[])
       // Partial volume correction on each TI
       if(opts.pvfile.set()) {
 
-        cout << "Partial volume correction" << endl;
+        cout << "Performing partial volume correction: linear regression kernel size " << endl;
+
+        // function to perform partial volume correction by linear regression
+        pvcorr_LR(data, mask, pvmap, kernel, data_pvcorr);
+
+        //save_volume4D(data_pvcorr, pvout_file_name);
       }
 
     //do epochwise output

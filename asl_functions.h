@@ -48,6 +48,9 @@ namespace OXASL {
   ReturnMatrix SVDdeconv(const Matrix& data, const Matrix& aif);
   // create a (simple) convolution matrix
   ReturnMatrix convmtx(const ColumnVector& invec);
+
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(data, mask, pvmap, kernel, data_pvcorr);
 }
 
 #endif
