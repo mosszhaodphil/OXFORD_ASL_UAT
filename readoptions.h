@@ -159,7 +159,7 @@ help(string("-h,--help"), false,
       false, requires_argument),
     kernel(string("--kernel"), 5, string("Kernel size of partial volume correction. Default: 5"),
       false, requires_argument),
-    pvout_file(string("--pvout"), string("pvout"), string("Partial volume output file name. Default: pv_output"),
+    pvout_file(string("--pvout"), string(""), string("Partial volume output file name. Default: pv_output"),
       false, requires_argument),
 
 
