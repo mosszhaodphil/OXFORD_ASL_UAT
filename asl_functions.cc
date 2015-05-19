@@ -437,9 +437,7 @@ namespace OXASL {
 
       // Linear regression PV correction
       data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
-      cout << ".";
     }
-    cout << endl;
   }
 
   // Function to correct PV using LR method
@@ -503,6 +501,9 @@ namespace OXASL {
               pv_map.activateROI();
               data_roi = data_in.ROI();
               pv_roi = pv_map.ROI();
+
+              cout << "correctionhhh" << endl;
+              getchar();
               
               
               ColumnVector data_roi_v_t = ColumnVector(data_roi.xsize() * data_roi.ysize() * data_roi.zsize());

@@ -71,22 +71,20 @@ int main(int argc, char *argv[])
     else if(oaf.compare("tc")==0) outdiff=false;
     else throw Exception("Unrecognised output asl form");
     */
+    bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
+
+    //load data
+    volume4D<float> data;
+    read_volume4D(data,opts.datafile.value());
 
     // Partail volume correction variables
     volume<float> pvmap;
     read_volume(pvmap, opts.pvfile.value());
     int kernel;
     kernel = opts.kernel.value(); // default kernel size is 5
-    volume4D<float> data_pvcorr; // partial volume corrected data
+    volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
     string pvout_file_name; // partial volume corrected output file name
     pvout_file_name = opts.pvout_file.value();
-
-
-    bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
-
-    //load data
-    volume4D<float> data;
-    read_volume4D(data,opts.datafile.value());
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
