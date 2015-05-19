@@ -217,15 +217,24 @@ int main(int argc, char *argv[])
       if(opts.pvfile.set()) {
 
         // Check mask file is specified
-        if(opts.maskfile.set()) {
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.pvout_file.set()) )  {
           cout << "Start partial volume correction" << endl;
           // function to perform partial volume correction by linear regression
           pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
           save_volume4D(data_pvcorr, pvout_file_name);
           cout << "Partial volume correction done!" << endl;
         }
-        else {
+        else if(!opts.maskfile.set()) {
           throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.pvout_file.set()) {
+          throw Exception("Missing output file. --pvout=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
         }
       }
 
