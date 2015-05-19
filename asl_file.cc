@@ -84,7 +84,6 @@ int main(int argc, char *argv[])
     kernel = opts.kernel.value(); // default kernel size is 5
     volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
     string pvout_file_name; // partial volume corrected output file name
-    pvout_file_name = opts.pvout_file.value();
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -185,6 +184,44 @@ int main(int argc, char *argv[])
       else if (o==1) { asldataout=asldataodd; fsub="_odd"; cout << "Dealing with odd members of pairs"<<endl;}
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
 
+      // Partial volume correction on each TI
+      if(opts.pvfile.set()) {
+
+        // Check mask file is specified
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+          cout << "Start partial volume correction" << endl;
+
+          // Convert asldataout to volume4D<float>
+          Matrix aslmatrix_non_pvcorr;
+          volume4D<float> asldata_non_pvcorr;
+          stdform2data(asldataout, aslmatrix_non_pvcorr, outblocked, outpairs);
+          asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
+
+          // function to perform partial volume correction by linear regression
+          pvcorr_LR(asldata_non_pvcorr, ndata, mask, pvmap, kernel, data_pvcorr);
+
+          //covert data_pvcorr to vector<Matrix> aka stdform 
+          Matrix data_pvcorr_mtx;
+          data_pvcorr_mtx = data_pvcorr.matrix(mask);
+          data2stdform(datamtx, asldataout, ntis, isblocked, ispairs);
+
+          //save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else if(!opts.maskfile.set()) {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.out.set()) {
+          throw Exception("Missing output file. --out=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
+        }
+      }
+
       //output data
       if (opts.out.set()) {
 	Matrix outmtx;
@@ -211,31 +248,6 @@ int main(int argc, char *argv[])
       //split data into separate file for each TI
       if (opts.splitout.set()) {
         splitout(asldataout,mask,opts.splitout.value()+fsub);
-      }
-
-      // Partial volume correction on each TI
-      if(opts.pvfile.set()) {
-
-        // Check mask file is specified
-        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.pvout_file.set()) )  {
-          cout << "Start partial volume correction" << endl;
-          // function to perform partial volume correction by linear regression
-          pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
-          save_volume4D(data_pvcorr, pvout_file_name);
-          cout << "Partial volume correction done!" << endl;
-        }
-        else if(!opts.maskfile.set()) {
-          throw Exception("Missing mask file. --mask=<mask file>");
-        }
-        else if(!opts.kernel.set()) {
-          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
-        }
-        else if(!opts.pvout_file.set()) {
-          throw Exception("Missing output file. --pvout=<output file name>");
-        }
-        else {
-          throw Exception("Halt!");
-        }
       }
 
     //do epochwise output

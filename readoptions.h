@@ -58,7 +58,6 @@ public:
   // Partial volume correction (linear regression method) parameters
   Option<string> pvfile;
   Option<int> kernel;
-  Option<string> pvout_file;
 
   void parse_command_line(int argc, char** argv);
 
@@ -159,8 +158,6 @@ help(string("-h,--help"), false,
       false, requires_argument),
     kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be integer between 3 and 9"),
       false, requires_argument),
-    pvout_file(string("--pvout"), string(""), string("Partial volume output file name"),
-      false, requires_argument),
 
 
 
@@ -195,7 +192,6 @@ help(string("-h,--help"), false,
 
        options.add(pvfile);
        options.add(kernel);
-       options.add(pvout_file);
 
      }
 
