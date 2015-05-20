@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
     ReadOptions& opts = ReadOptions::getInstance();
     opts.parse_command_line(argc,argv);
 
+
    //deal with input data type options
     bool isblocked=false; //indicates if data is in blocks of repeats rather than TIs
     bool ispairs=false; //indicates if data contains adjacent pairs of measurments
@@ -77,13 +78,16 @@ int main(int argc, char *argv[])
     volume4D<float> data;
     read_volume4D(data,opts.datafile.value());
 
+
     // Partail volume correction variables
     volume<float> pvmap;
-    read_volume(pvmap, opts.pvfile.value());
     int kernel;
-    kernel = opts.kernel.value(); // default kernel size is 5
     volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
-    string pvout_file_name; // partial volume corrected output file name
+    // Read partial volume map and kernel size
+    if(opts.pvfile.set() && opts.kernel.set()) {
+      read_volume(pvmap, opts.pvfile.value());
+      kernel = opts.kernel.value();
+    }
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -91,7 +95,7 @@ int main(int argc, char *argv[])
     mask.setdims(data.xdim(),data.ydim(),data.zdim());
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
-
+    
     Matrix datamtx;
     datamtx = data.matrix(mask);
     int nvox=datamtx.Ncols();
