@@ -189,6 +189,7 @@ int main(int argc, char *argv[])
 
         // Check mask file is specified
         if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
           cout << "Start partial volume correction" << endl;
 
           // Convert asldataout to volume4D<float>
@@ -202,8 +203,10 @@ int main(int argc, char *argv[])
 
           //covert data_pvcorr to vector<Matrix> aka stdform 
           Matrix data_pvcorr_mtx;
+          vector<Matrix> asldataout_pvcorr;
           data_pvcorr_mtx = data_pvcorr.matrix(mask);
-          data2stdform(datamtx, asldataout, ntis, isblocked, ispairs);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+          asldataout = asldataout_pvcorr;
 
           //save_volume4D(data_pvcorr, pvout_file_name);
           cout << "Partial volume correction done!" << endl;

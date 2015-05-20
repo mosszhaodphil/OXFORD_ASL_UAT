@@ -501,10 +501,6 @@ namespace OXASL {
               pv_map.activateROI();
               data_roi = data_in.ROI();
               pv_roi = pv_map.ROI();
-
-              cout << "correctionhhh" << endl;
-              getchar();
-              
               
               ColumnVector data_roi_v_t = ColumnVector(data_roi.xsize() * data_roi.ysize() * data_roi.zsize());
               ColumnVector pv_roi_v_t = ColumnVector(pv_roi.xsize() * pv_roi.ysize() * pv_roi.zsize());
