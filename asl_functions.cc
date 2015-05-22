@@ -421,6 +421,9 @@ namespace OXASL {
   // function to perform partial volume correction by linear regression
   void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
 
+    // Version control
+    cout << "PV correction by linear regression. version 1.0.1 (beta), 20150522" << endl;
+    
     // Clone input data to pv corrected data
     data_pvcorr = data_in;
 
