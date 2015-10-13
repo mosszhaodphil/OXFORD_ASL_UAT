@@ -418,31 +418,6 @@ namespace OXASL {
     save_volume4D(magout,fname+"_magntiude");
   }
 
-  // function to perform partial volume correction by linear regression
-  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
-
-    // Version control
-    cout << "PV correction by linear regression. version 1.0.1 (beta), 20150522" << endl;
-    
-    // Clone input data to pv corrected data
-    data_pvcorr = data_in;
-
-    // Correct NaN and INF numbers of input mask and pvmap
-    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
-    volume<float> pv_map_in_corr(pv_map.xsize(), pv_map.ysize(), pv_map.zsize());
-    mask_in_corr   = correct_NaN(mask);
-    pv_map_in_corr = correct_NaN(pv_map);
-
-    // Do correction on each slice of time series
-    for(int i = 0; i < ndata_in; i++) {
-      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
-      volume<float> corrected_data_ti = correct_NaN(data_in[i]);
-
-      // Linear regression PV correction
-      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
-    }
-  }
-
   // Function to correct PV using LR method
   volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel)
   {
@@ -461,13 +436,13 @@ namespace OXASL {
     int z_0;
     int z_1;
 
-    int count;
-    float pv_ave = 0.0f;
+    //int count;
+    float pv_average = 0.0f;
 
     // Get x y z dimension
-    int x = data_in.xsize();
-    int y = data_in.ysize();
-    int z = data_in.zsize();
+    int x = mask.xsize();
+    int y = mask.ysize();
+    int z = mask.zsize();
 
     volume<float> corr_data(x, y, z); // result matrix
 
@@ -477,7 +452,7 @@ namespace OXASL {
         for (int k = 0; k < z; k++) {
           // Only work with positive voxels
           if(mask.value(i, j, k) > 0) {
-
+            
             // Determine ROI boundary index
             x_0 = max(i - kernel, 0);
             x_1 = min(i + kernel, x - 1);
@@ -487,16 +462,42 @@ namespace OXASL {
             z_1 = min(k + kernel, z - 1);
 
             // create a submask here
-            mask.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
-            mask.activateROI();
-            submask = mask.ROI();
+            //mask.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+            //mask.activateROI();
+            //submask = mask.ROI();
+
+            // Define three column vectors to store data and PVE of the current regression kernel
+            ColumnVector sub_mask = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            ColumnVector sub_data = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            ColumnVector sub_pve  = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            
+            int sub_mask_count = 0;
+            int non_zero_count = 0;
+            float submask_sum = 0.0f; // value to store the sum of current mask kernel
+            for(int m = 0; m < x_1 - x_0 + 1; m++) {
+              for(int n = 0; n < y_1 - y_0 + 1; n++) {
+                for(int p = 0; p < z_1 - z_0 + 1; p++) {
+                  sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
+                  submask_sum = submask_sum + mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  if(mask.value(x_0 + m, y_0 + n, z_0 + p) > 0) {
+                    non_zero_count++;
+                  }
+                  sub_mask_count++;
+                }
+              }
+            }
 
             // calculate the sum of all elements in submask
             // proceed if sum is greater than 5 (arbitrary threshold)
-            if(submask.sum() > 5) {
+            if(submask_sum > 5) {
               /* Create an ROI (sub volume of data and PV map),
                 then mask it with submask to create sub data and PV map */
 
+              //cout << i << ", " << j << ", " << k << endl;
+              //getchar();
+              /*
               // Obtain ROI volume (must set limits and activate first)
               data_in.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
               pv_map.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
@@ -507,6 +508,15 @@ namespace OXASL {
               
               ColumnVector data_roi_v_t = ColumnVector(data_roi.xsize() * data_roi.ysize() * data_roi.zsize());
               ColumnVector pv_roi_v_t = ColumnVector(pv_roi.xsize() * pv_roi.ysize() * pv_roi.zsize());
+
+              cout << z_0 << ", " << z_1 << endl;
+              getchar();
+
+              cout << submask.xsize() << ", " << submask.ysize() << ", " << submask.zsize() << endl;
+              getchar();
+
+              cout << data_roi.xsize() << ", " << data_roi.ysize() << ", " << data_roi.zsize() << endl;
+              getchar();
 
               count = 0;
               // Apply a mask on data_roi and pv_roi
@@ -526,14 +536,16 @@ namespace OXASL {
                   }
                 }
               }
+              */
+
+              // Apply submask to the data and PVE of the current kernel
+              ColumnVector data_roi_v = ColumnVector(non_zero_count);
+              ColumnVector pv_roi_v = ColumnVector(non_zero_count);
               
-              ColumnVector data_roi_v = ColumnVector(count);
-              ColumnVector pv_roi_v = ColumnVector(count);
-              
-              
-              for(int a = 0; a < count; a++) {
-                data_roi_v.element(a) = data_roi_v_t.element(a);
-                pv_roi_v.element(a) = pv_roi_v_t.element(a);
+              // Extract all non-zero elements
+              for(int a = 0; a < non_zero_count; a++) {
+                data_roi_v.element(a) = sub_data.element(a);
+                pv_roi_v.element(a) = sub_pve.element(a);
               }
               
               // Unstable function
@@ -544,8 +556,8 @@ namespace OXASL {
               // Now data_roi_v and pv_roi_v stores the non-zero elemnts within this submask
 
               // Deactivate ROI
-              data_in.deactivateROI();
-              pv_map.deactivateROI();
+              //data_in.deactivateROI();
+              //pv_map.deactivateROI();
 
               // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
               // This will cause run time error
@@ -558,14 +570,12 @@ namespace OXASL {
                 // ((P^t * P) ^ -1) * (P^t)
                 pseudo_inv = ( (pv_roi_v.t() * pv_roi_v).i() ) * (pv_roi_v.t());
 
-                //cout << "  hh" << endl;
-
                 // Get average PV value of the current kernel
-                pv_ave = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
+                pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
 
                 // Calculate PV corrected data only if there is some PV compoment
                 // If there is little PV small, make it zero
-                if(pv_ave >= 0.01) {
+                if(pv_average >= 0.01) {
                   pv_corr_result = pseudo_inv * data_roi_v;
                   corr_data.value(i, j, k) = pv_corr_result.element(0, 0);
                 }
@@ -576,11 +586,10 @@ namespace OXASL {
             }
 
             else {
-              // do nothing at the moment
             } // end submask
 
             // Discard current submask (ROI)
-            mask.deactivateROI();
+            //mask.deactivateROI();
 
           }
 
@@ -623,7 +632,30 @@ namespace OXASL {
   }
 
 
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
 
+    // Version control
+    cout << "PV correction by linear regression. version 1.0.2 (beta). Last compiled on 20151013" << endl;
+    
+    // Clone input data to pv corrected data
+    data_pvcorr = data_in;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    volume<float> pv_map_in_corr(pv_map.xsize(), pv_map.ysize(), pv_map.zsize());
+    mask_in_corr   = correct_NaN(mask);
+    pv_map_in_corr = correct_NaN(pv_map);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> corrected_data_ti = correct_NaN(data_in[i]);
+
+      // Linear regression PV correction
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
+    }
+  }
 
 
 }
