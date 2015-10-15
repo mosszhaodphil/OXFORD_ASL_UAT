@@ -427,6 +427,7 @@ namespace OXASL {
     volume<float> pv_roi;
     RowVector pseudo_inv;
     Matrix pv_corr_result;
+    Matrix ha_result;
 
     // Variables to store the boundary index of submask (ROI)
     int x_0;
@@ -474,9 +475,9 @@ namespace OXASL {
             int sub_mask_count = 0;
             int non_zero_count = 0;
             float submask_sum = 0.0f; // value to store the sum of current mask kernel
-            for(int m = 0; m < x_1 - x_0 + 1; m++) {
+            for(int p = 0; p < z_1 - z_0 + 1; p++) {
               for(int n = 0; n < y_1 - y_0 + 1; n++) {
-                for(int p = 0; p < z_1 - z_0 + 1; p++) {
+                for(int m = 0; m < x_1 - x_0 + 1; m++) {
                   sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
                   sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
                   sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
@@ -541,12 +542,27 @@ namespace OXASL {
               // Apply submask to the data and PVE of the current kernel
               ColumnVector data_roi_v = ColumnVector(non_zero_count);
               ColumnVector pv_roi_v = ColumnVector(non_zero_count);
+              RowVector pv_roi_r = RowVector(non_zero_count);
+
+              //cout << non_zero_count << endl;
+              //cout << sub_mask_count << endl;
               
+              int non_zero_index = 0;
               // Extract all non-zero elements
-              for(int a = 0; a < non_zero_count; a++) {
-                data_roi_v.element(a) = sub_data.element(a);
-                pv_roi_v.element(a) = sub_pve.element(a);
+              for(int a = 0; a < sub_mask_count; a++) {
+                if(sub_mask.element(a) > 0) {
+                  data_roi_v.element(non_zero_index) = sub_data.element(a);
+                  pv_roi_v.element(non_zero_index) = sub_pve.element(a);
+                  pv_roi_r.element(non_zero_index) = sub_pve.element(a);
+                  non_zero_index++;
+                }
+                else {
+                  continue;
+                }
               }
+
+              //cout << non_zero_index << endl;
+              //getchar();
               
               // Unstable function
               //data_roi_v = apply_mask(data_roi, submask);
@@ -564,11 +580,29 @@ namespace OXASL {
               // So we assign the corrected result to zero in such cases
               if(pv_roi_v.IsZero()) {
                 corr_data.value(i, j, k) = 0.0f;
+                cout << "singular" << endl;
               }
               else {
                 // Compute pseudo inversion matrix of PV map
                 // ((P^t * P) ^ -1) * (P^t)
-                pseudo_inv = ( (pv_roi_v.t() * pv_roi_v).i() ) * (pv_roi_v.t());
+                pseudo_inv = ( ( (pv_roi_v.t()) * pv_roi_v).i() ) * (pv_roi_v.t());
+                pseudo_inv = ( (pv_roi_r * pv_roi_v).i() ) * (pv_roi_r);
+                //pseudo_inv = ( pv_roi_v.t().operator*(pv_roi_v) ).i().operator*(pv_roi_v.t());
+                ha_result = ( (pv_roi_v.t()) * pv_roi_v).i();
+                for(int c = 0; c < non_zero_index; c++) {
+                  if(pv_roi_r.element(c) > 0) {
+                    cout << ha_result.element(0, 0) << endl;
+                    getchar();
+                  }
+
+                }
+                //cout << non_zero_index << endl;
+                //getchar();
+                //cout << ha_result.element(0, 0) << endl;
+                //getchar();
+
+                //cout << pseudo_inv.element(non_zero_index - 1) << endl;
+                //getchar();
 
                 // Get average PV value of the current kernel
                 pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
@@ -582,6 +616,9 @@ namespace OXASL {
                 else {
                   corr_data.value(i, j, k) = 0.0f;
                 }
+
+                //cout << corr_data.value(i, j, k) << endl;
+                //getchar();
               }
             }
 
