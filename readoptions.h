@@ -155,7 +155,7 @@ help(string("-h,--help"), false,
       false,requires_argument),
 
     // Partial volume (linear regression) options
-    pv_gm_file(string("--pvmap"), string(""), string("GM partial volume map"),
+    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
       false, requires_argument),
     pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
       false, requires_argument),
