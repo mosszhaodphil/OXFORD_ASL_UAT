@@ -80,12 +80,14 @@ int main(int argc, char *argv[])
 
 
     // Partail volume correction variables
-    volume<float> pvmap;
+    volume<float> pv_gm_map;
+    volume<float> pv_wm_map;
     int kernel;
     volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
     // Read partial volume map and kernel size
-    if(opts.pvfile.set() && opts.kernel.set()) {
-      read_volume(pvmap, opts.pvfile.value());
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set() && opts.kernel.set()) {
+      read_volume(pv_gm_map, opts.pv_gm_file.value());
+      read_volume(pv_wm_map, opts.pv_wm_file.value());
       kernel = opts.kernel.value();
     }
 
@@ -189,7 +191,7 @@ int main(int argc, char *argv[])
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
 
       // Partial volume correction on each TI
-      if(opts.pvfile.set()) {
+      if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
 
         // Check mask file is specified
         if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
@@ -203,7 +205,7 @@ int main(int argc, char *argv[])
           asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
 
           // function to perform partial volume correction by linear regression
-          pvcorr_LR(asldata_non_pvcorr, ndata, mask, pvmap, kernel, data_pvcorr);
+          pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
 
           //covert data_pvcorr to vector<Matrix> aka stdform 
           Matrix data_pvcorr_mtx;

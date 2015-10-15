@@ -419,13 +419,13 @@ namespace OXASL {
   }
 
   // Function to correct PV using LR method
-  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel)
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel)
   {
 
     volume<float> submask;
     volume<float> data_roi;
     volume<float> pv_roi;
-    RowVector pseudo_inv;
+    Matrix pseudo_inv;
     Matrix pv_corr_result;
     Matrix ha_result;
 
@@ -437,7 +437,6 @@ namespace OXASL {
     int z_0;
     int z_1;
 
-    //int count;
     float pv_average = 0.0f;
 
     // Get x y z dimension
@@ -445,7 +444,8 @@ namespace OXASL {
     int y = mask.ysize();
     int z = mask.zsize();
 
-    volume<float> corr_data(x, y, z); // result matrix
+    volume<float> gm_corr_data(x, y, z); // result matrix GM
+    //volume<float> wm_corr_data(x, y, z); // result matrix WM
 
     // Linear regression to correct (smooth) the data
     for (int i = 0; i < x; i++) {
@@ -470,7 +470,7 @@ namespace OXASL {
             // Define three column vectors to store data and PVE of the current regression kernel
             ColumnVector sub_mask = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
             ColumnVector sub_data = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
-            ColumnVector sub_pve  = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            Matrix sub_pve  = Matrix((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1), 2);
             
             int sub_mask_count = 0;
             int non_zero_count = 0;
@@ -478,9 +478,15 @@ namespace OXASL {
             for(int p = 0; p < z_1 - z_0 + 1; p++) {
               for(int n = 0; n < y_1 - y_0 + 1; n++) {
                 for(int m = 0; m < x_1 - x_0 + 1; m++) {
+                  //sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
                   sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
                   sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
-                  sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, first column is GM
+                  sub_pve.element(sub_mask_count, 0) = pv_map_gm.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, second column is WM
+                  sub_pve.element(sub_mask_count, 1) = pv_map_wm.value(x_0 + m, y_0 + n, z_0 + p);
                   submask_sum = submask_sum + mask.value(x_0 + m, y_0 + n, z_0 + p);
                   if(mask.value(x_0 + m, y_0 + n, z_0 + p) > 0) {
                     non_zero_count++;
@@ -493,67 +499,18 @@ namespace OXASL {
             // calculate the sum of all elements in submask
             // proceed if sum is greater than 5 (arbitrary threshold)
             if(submask_sum > 5) {
-              /* Create an ROI (sub volume of data and PV map),
-                then mask it with submask to create sub data and PV map */
-
-              //cout << i << ", " << j << ", " << k << endl;
-              //getchar();
-              /*
-              // Obtain ROI volume (must set limits and activate first)
-              data_in.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
-              pv_map.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
-              data_in.activateROI();
-              pv_map.activateROI();
-              data_roi = data_in.ROI();
-              pv_roi = pv_map.ROI();
-              
-              ColumnVector data_roi_v_t = ColumnVector(data_roi.xsize() * data_roi.ysize() * data_roi.zsize());
-              ColumnVector pv_roi_v_t = ColumnVector(pv_roi.xsize() * pv_roi.ysize() * pv_roi.zsize());
-
-              cout << z_0 << ", " << z_1 << endl;
-              getchar();
-
-              cout << submask.xsize() << ", " << submask.ysize() << ", " << submask.zsize() << endl;
-              getchar();
-
-              cout << data_roi.xsize() << ", " << data_roi.ysize() << ", " << data_roi.zsize() << endl;
-              getchar();
-
-              count = 0;
-              // Apply a mask on data_roi and pv_roi
-              // Extract values from data_roi and pv_roi whose mask values are non-zero
-              for(int a = 0; a < data_roi.xsize(); a++) {
-                for(int b = 0; b < data_roi.ysize(); b++) {
-                  for(int c = 0; c < data_roi.zsize(); c++) {
-                    if(submask.value(a, b, c) > 0) {
-                      data_roi_v_t.element(count) = data_roi.value(a, b, c);
-                      pv_roi_v_t.element(count) = pv_roi.value(a, b, c);
-                      count++;
-
-                    }
-                    else {
-                      continue;
-                    }
-                  }
-                }
-              }
-              */
-
               // Apply submask to the data and PVE of the current kernel
               ColumnVector data_roi_v = ColumnVector(non_zero_count);
-              ColumnVector pv_roi_v = ColumnVector(non_zero_count);
-              RowVector pv_roi_r = RowVector(non_zero_count);
-
-              //cout << non_zero_count << endl;
-              //cout << sub_mask_count << endl;
+              Matrix pv_roi_v = Matrix(non_zero_count, 2);
+              //RowVector pv_roi_r = RowVector(non_zero_count);
               
               int non_zero_index = 0;
               // Extract all non-zero elements
               for(int a = 0; a < sub_mask_count; a++) {
                 if(sub_mask.element(a) > 0) {
                   data_roi_v.element(non_zero_index) = sub_data.element(a);
-                  pv_roi_v.element(non_zero_index) = sub_pve.element(a);
-                  pv_roi_r.element(non_zero_index) = sub_pve.element(a);
+                  pv_roi_v.element(non_zero_index, 0) = sub_pve.element(a, 0);
+                  pv_roi_v.element(non_zero_index, 1) = sub_pve.element(a, 1);
                   non_zero_index++;
                 }
                 else {
@@ -561,48 +518,17 @@ namespace OXASL {
                 }
               }
 
-              //cout << non_zero_index << endl;
-              //getchar();
-              
-              // Unstable function
-              //data_roi_v = apply_mask(data_roi, submask);
-              //pv_roi_v = apply_mask(pv_roi, submask);
-
-              
-              // Now data_roi_v and pv_roi_v stores the non-zero elemnts within this submask
-
-              // Deactivate ROI
-              //data_in.deactivateROI();
-              //pv_map.deactivateROI();
-
               // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
               // This will cause run time error
               // So we assign the corrected result to zero in such cases
               if(pv_roi_v.IsZero()) {
-                corr_data.value(i, j, k) = 0.0f;
+                gm_corr_data.value(i, j, k) = 0.0f;
                 cout << "singular" << endl;
               }
               else {
                 // Compute pseudo inversion matrix of PV map
                 // ((P^t * P) ^ -1) * (P^t)
                 pseudo_inv = ( ( (pv_roi_v.t()) * pv_roi_v).i() ) * (pv_roi_v.t());
-                pseudo_inv = ( (pv_roi_r * pv_roi_v).i() ) * (pv_roi_r);
-                //pseudo_inv = ( pv_roi_v.t().operator*(pv_roi_v) ).i().operator*(pv_roi_v.t());
-                ha_result = ( (pv_roi_v.t()) * pv_roi_v).i();
-                for(int c = 0; c < non_zero_index; c++) {
-                  if(pv_roi_r.element(c) > 0) {
-                    cout << ha_result.element(0, 0) << endl;
-                    getchar();
-                  }
-
-                }
-                //cout << non_zero_index << endl;
-                //getchar();
-                //cout << ha_result.element(0, 0) << endl;
-                //getchar();
-
-                //cout << pseudo_inv.element(non_zero_index - 1) << endl;
-                //getchar();
 
                 // Get average PV value of the current kernel
                 pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
@@ -611,22 +537,18 @@ namespace OXASL {
                 // If there is little PV small, make it zero
                 if(pv_average >= 0.01) {
                   pv_corr_result = pseudo_inv * data_roi_v;
-                  corr_data.value(i, j, k) = pv_corr_result.element(0, 0);
+                  gm_corr_data.value(i, j, k) = pv_corr_result.element(0, 0); // output GM only
+                  //corr_data.value(i, j, k) = pv_corr_result.element(1, 0);
                 }
                 else {
-                  corr_data.value(i, j, k) = 0.0f;
+                  gm_corr_data.value(i, j, k) = 0.0f;
                 }
 
-                //cout << corr_data.value(i, j, k) << endl;
-                //getchar();
               }
             }
 
             else {
             } // end submask
-
-            // Discard current submask (ROI)
-            //mask.deactivateROI();
 
           }
 
@@ -638,7 +560,7 @@ namespace OXASL {
       }
     }
 
-    return corr_data;
+    return gm_corr_data;
 
   } // End function correct_pv_lr
 
@@ -670,7 +592,7 @@ namespace OXASL {
 
 
   // function to perform partial volume correction by linear regression
-  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
+  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr) {
 
     // Version control
     cout << "PV correction by linear regression. version 1.0.2 (beta). Last compiled on 20151013" << endl;
@@ -680,9 +602,11 @@ namespace OXASL {
 
     // Correct NaN and INF numbers of input mask and pvmap
     volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
-    volume<float> pv_map_in_corr(pv_map.xsize(), pv_map.ysize(), pv_map.zsize());
+    volume<float> pv_map_gm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
+    volume<float> pv_map_wm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
     mask_in_corr   = correct_NaN(mask);
-    pv_map_in_corr = correct_NaN(pv_map);
+    pv_map_gm_in_corr = correct_NaN(pv_map_gm);
+    pv_map_wm_in_corr = correct_NaN(pv_map_wm);
 
     // Do correction on each slice of time series
     for(int i = 0; i < ndata_in; i++) {
@@ -690,7 +614,7 @@ namespace OXASL {
       volume<float> corrected_data_ti = correct_NaN(data_in[i]);
 
       // Linear regression PV correction
-      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_gm_in_corr, pv_map_wm_in_corr, kernel);
     }
   }
 

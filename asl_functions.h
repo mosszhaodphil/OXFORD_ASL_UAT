@@ -50,10 +50,10 @@ namespace OXASL {
   ReturnMatrix convmtx(const ColumnVector& invec);
 
   // function to perform partial volume correction by linear regression
-  void pvcorr_LR(const volume4D<float>& data, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr);
+  void pvcorr_LR(const volume4D<float>& data, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr);
 
   // PV correction using linear regression (Asllani's method)
-  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel);
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel);
 
   // Function to correct NaN values
   volume<float> correct_NaN(const volume<float>& data_in);
