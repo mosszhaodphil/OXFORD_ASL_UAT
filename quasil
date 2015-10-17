@@ -68,6 +68,8 @@ until [ -z $1 ]; do
 	    shift;;
 	--disp) disp=1
 	    ;;
+    --kern) kern=$2
+        shift;;
 	--mfree) mfree=1
 	    ;;
 	--tis) tis=$2
@@ -359,6 +361,11 @@ if [ ! -z $pvcorr ]; then
     ${FSLDIR}/bin/imcp gm_mask $stdir/$outdir/gm_mask
     ${FSLDIR}/bin/imcp wm_mask $stdir/$outdir/wm_mask
 
+    # Correct mask: remove voxels with zero intensity on both GM and WM
+    # Then copy the new mask to output directory
+    ${FSLDIR}/bin/fslmaths gm_mask -add wm_mask gm_wm_mask
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -mas gm_wm_mask pv_mask
+    ${FSLDIR}/bin/imcp pv_mask $stdir/$outdir/pv_mask
 fi
 
 
@@ -370,7 +377,7 @@ if [ -z $mfree ]; then
 echo "Begin model-based analysis"
 
     echo "#QUASAR analysis options" > options.txt
-    echo "--mask=mask" >> options.txt
+    echo "--mask=pv_mask" >> options.txt
     echo "--method=spatialvb" >> options.txt
     echo "--noise=white" >> options.txt
     echo "--model=quasar" >> options.txt
@@ -411,7 +418,7 @@ echo "Begin model-based analysis"
         # PV correction
         echo "--inferwm " >> options.txt
         echo "--usepve " >> options.txt
-        echo "--max-iterations=1000" >> options.txt # Maximum 1000 iterations
+        echo "--max-iterations=200" >> options.txt # Maximum 1000 iterations
         if [ ! -z $infertau ]; then
             #infer bolus duration
             echo "--infertau --tauboff" >> options.txt #Note we have only a single tau for both arterial and tissue signal (both also share the same dispersion properties)
@@ -434,10 +441,14 @@ echo "Begin model-based analysis"
         fi
     fi
     
-    kern="none"
+
     if [ ! -z $disp ]; then
-    # include dispersion in the model
-	kern="gamma"
+        # include dispersion in the model (default is gamma)
+        if [ ! -z $kern ]; then
+            kern="gamma"
+        fi
+    else
+        kern="none"
     fi
 
     $fabber --data=asldata --data-order=singlefile --disp=$kern --output=full -@ options.txt
