@@ -425,8 +425,8 @@ echo "Begin model-based analysis"
             if [ -z $fixt1 ]; then
                 echo "--image-prior11=calib_latest/T1t " >> options.txt # WM starts with the same measured T1 value as GM
             fi
-            echo "--image-prior12=pvgm "
-            echo "--image-prior13=pvwm "
+            echo "--image-prior12=pvgm " >> options.txt
+            echo "--image-prior13=pvwm " >> options.txt
             echo "--image-prior19=calib_latest/g" >> options.txt
             echo "--param-spatial-priors=MNNAN${t1sp}NMNN${t1sp}IINNNNNI" >> options.txt
         else
