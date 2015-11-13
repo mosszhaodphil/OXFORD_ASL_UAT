@@ -184,6 +184,10 @@ int main(int argc, char *argv[])
       outpairs=false;
     }
 
+    if (opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+      nout = 2;
+    }
+
     // OUTPUT: Main output section - anything that is compatible with the splitting of pairs (splitpairs) can go in here
     for (int o=1; o<=nout; o++) {
       if(!opts.splitpairs.value()) asldataout=asldata;
@@ -198,14 +202,26 @@ int main(int argc, char *argv[])
 
           cout << "Start partial volume correction" << endl;
 
+
           // Convert asldataout to volume4D<float>
           Matrix aslmatrix_non_pvcorr;
           volume4D<float> asldata_non_pvcorr;
           stdform2data(asldataout, aslmatrix_non_pvcorr, outblocked, outpairs);
           asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
 
+          if(o == 1) {
+            cout << "Dealing with GM PV Correction" << endl;
+            fsub = "_gm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+          }
+
+          if(o == 2) {
+            cout << "Dealing with WM PV Correction" << endl;
+            fsub = "_wm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_wm_map, pv_gm_map, kernel, data_pvcorr);
+          }
           // function to perform partial volume correction by linear regression
-          pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+          //pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
 
           //covert data_pvcorr to vector<Matrix> aka stdform 
           Matrix data_pvcorr_mtx;

@@ -595,7 +595,7 @@ namespace OXASL {
   void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr) {
 
     // Version control
-    cout << "PV correction by linear regression. version 1.0.2 (beta). Last compiled on 20151013" << endl;
+    cout << "PV correction by linear regression. version 1.0.3 (beta). Last compiled on 20151113" << endl;
     
     // Clone input data to pv corrected data
     data_pvcorr = data_in;
