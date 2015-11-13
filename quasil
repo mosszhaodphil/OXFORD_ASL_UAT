@@ -363,9 +363,9 @@ if [ ! -z $pvcorr ]; then
 
     # Correct mask: remove voxels with zero intensity on both GM and WM
     # Then copy the new mask to output directory
-    ${FSLDIR}/bin/fslmaths gm_mask -add wm_mask gm_wm_mask
-    ${FSLDIR}/bin/fslmaths $tempdir/mask -mas gm_wm_mask pv_mask
-    ${FSLDIR}/bin/imcp pv_mask $stdir/$outdir/pv_mask
+    #${FSLDIR}/bin/fslmaths gm_mask -add wm_mask gm_wm_mask
+    #${FSLDIR}/bin/fslmaths $tempdir/mask -mas gm_wm_mask pv_mask
+    #${FSLDIR}/bin/imcp pv_mask $stdir/$outdir/pv_mask
 fi
 
 
@@ -377,7 +377,7 @@ if [ -z $mfree ]; then
 echo "Begin model-based analysis"
 
     echo "#QUASAR analysis options" > options.txt
-    echo "--mask=pv_mask" >> options.txt
+    echo "--mask=mask" >> options.txt
     echo "--method=spatialvb" >> options.txt
     echo "--noise=white" >> options.txt
     echo "--model=quasar" >> options.txt
