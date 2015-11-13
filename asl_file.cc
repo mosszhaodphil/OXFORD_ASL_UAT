@@ -1,70 +1,12 @@
 /*   asl_file.cc file manipulator for multi-TI ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
 
-/*  Part of FSL - FMRIB's Software Library
-    http://www.fmrib.ox.ac.uk/fsl
-    fsl@fmrib.ox.ac.uk
-    
-    Developed at FMRIB (Oxford Centre for Functional Magnetic Resonance
-    Imaging of the Brain), Department of Clinical Neurology, Oxford
-    University, Oxford, UK
-    
-    
-    LICENCE
-    
-    FMRIB Software Library, Release 5.0 (c) 2012, The University of
-    Oxford (the "Software")
-    
-    The Software remains the property of the University of Oxford ("the
-    University").
-    
-    The Software is distributed "AS IS" under this Licence solely for
-    non-commercial use in the hope that it will be useful, but in order
-    that the University as a charitable foundation protects its assets for
-    the benefit of its educational and research purposes, the University
-    makes clear that no condition is made or to be implied, nor is any
-    warranty given or to be implied, as to the accuracy of the Software,
-    or that it will be suitable for any particular purpose or for use
-    under any specific conditions. Furthermore, the University disclaims
-    all responsibility for the use which is made of the Software. It
-    further disclaims any liability for the outcomes arising from using
-    the Software.
-    
-    The Licensee agrees to indemnify the University and hold the
-    University harmless from and against any and all claims, damages and
-    liabilities asserted by third parties (including claims for
-    negligence) which arise directly or indirectly from the use of the
-    Software or the sale of any products based on the Software.
-    
-    No part of the Software may be reproduced, modified, transmitted or
-    transferred in any form or by any means, electronic or mechanical,
-    without the express permission of the University. The permission of
-    the University is not required if the said reproduction, modification,
-    transmission or transference is done without financial return, the
-    conditions of this Licence are imposed upon the receiver of the
-    product, and all original and amended source code is included in any
-    transmitted product. You may be held legally responsible for any
-    copyright infringement that is caused or encouraged by your failure to
-    abide by these terms and conditions.
-    
-    You are not permitted under this Licence to use this Software
-    commercially. Use for which any financial return is received shall be
-    defined as commercial use, and includes (1) integration of all or part
-    of the source code or the Software into a product for sale or license
-    by or on behalf of Licensee to third parties or (2) use of the
-    Software or any derivative of it for research with the final aim of
-    developing software products for sale or license to a third party or
-    (3) use of the Software or any derivative of it for research with the
-    final aim of developing non-software products for sale or license to a
-    third party, or (4) use of the Software to provide any service to an
-    external organisation for which payment is received. If you are
-    interested in using the Software commercially, please contact Isis
-    Innovation Limited ("Isis"), the technology transfer company of the
-    University, to negotiate a licence. Contact details are:
-    innovation@isis.ox.ac.uk quoting reference DE/9564. */
+    Copyright (C) 2015 University of Oxford  */
+
+/*   CCOPYRIGHT   */
 
 #include <iostream>
 #include <math.h>
@@ -93,6 +35,7 @@ int main(int argc, char *argv[])
     //parse command line (puts these into the log file)
     ReadOptions& opts = ReadOptions::getInstance();
     opts.parse_command_line(argc,argv);
+
 
    //deal with input data type options
     bool isblocked=false; //indicates if data is in blocks of repeats rather than TIs
@@ -129,12 +72,24 @@ int main(int argc, char *argv[])
     else if(oaf.compare("tc")==0) outdiff=false;
     else throw Exception("Unrecognised output asl form");
     */
-
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
 
     //load data
     volume4D<float> data;
     read_volume4D(data,opts.datafile.value());
+
+
+    // Partail volume correction variables
+    volume<float> pv_gm_map;
+    volume<float> pv_wm_map;
+    int kernel;
+    volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    // Read partial volume map and kernel size
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set() && opts.kernel.set()) {
+      read_volume(pv_gm_map, opts.pv_gm_file.value());
+      read_volume(pv_wm_map, opts.pv_wm_file.value());
+      kernel = opts.kernel.value();
+    }
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -142,7 +97,7 @@ int main(int argc, char *argv[])
     mask.setdims(data.xdim(),data.ydim(),data.zdim());
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
-
+    
     Matrix datamtx;
     datamtx = data.matrix(mask);
     int nvox=datamtx.Ncols();
@@ -235,6 +190,47 @@ int main(int argc, char *argv[])
       else if (o==1) { asldataout=asldataodd; fsub="_odd"; cout << "Dealing with odd members of pairs"<<endl;}
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
 
+      // Partial volume correction on each TI
+      if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+
+        // Check mask file is specified
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
+          cout << "Start partial volume correction" << endl;
+
+          // Convert asldataout to volume4D<float>
+          Matrix aslmatrix_non_pvcorr;
+          volume4D<float> asldata_non_pvcorr;
+          stdform2data(asldataout, aslmatrix_non_pvcorr, outblocked, outpairs);
+          asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
+
+          // function to perform partial volume correction by linear regression
+          pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+
+          //covert data_pvcorr to vector<Matrix> aka stdform 
+          Matrix data_pvcorr_mtx;
+          vector<Matrix> asldataout_pvcorr;
+          data_pvcorr_mtx = data_pvcorr.matrix(mask);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+          asldataout = asldataout_pvcorr;
+
+          //save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else if(!opts.maskfile.set()) {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.out.set()) {
+          throw Exception("Missing output file. --out=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
+        }
+      }
+
       //output data
       if (opts.out.set()) {
 	Matrix outmtx;
@@ -260,21 +256,7 @@ int main(int argc, char *argv[])
     
       //split data into separate file for each TI
       if (opts.splitout.set()) {
-	splitout(asldataout,mask,opts.splitout.value()+fsub);
-	/*cout << "Splitting ASL data into files for each TI" << endl;
-	  volume4D<float> blockout;
-	  for (int n=0; n<ntis; n++) 
-	  {
-	  char cstr [5];
-	  if (n<10) sprintf(cstr,"00%d",n);
-	  else if (n<100) sprintf(cstr,"0%d",n);
-	  else if (n<1000) sprintf(cstr,"%d",n);
-	  else throw Exception("More than 1000 measurements in this ASL data file, sorry cannot handle this operation");
-	  string tino(cstr);
-	  
-	  blockout.setmatrix(asldata[n],mask);
-	  save_volume4D(blockout,opts.splitout.value()+tino);
-	  }*/
+        splitout(asldataout,mask,opts.splitout.value()+fsub);
       }
 
     //do epochwise output

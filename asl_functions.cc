@@ -1,70 +1,12 @@
 /*   asl_functions.cc various functions for the manipulation of ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
 
-/*  Part of FSL - FMRIB's Software Library
-    http://www.fmrib.ox.ac.uk/fsl
-    fsl@fmrib.ox.ac.uk
-    
-    Developed at FMRIB (Oxford Centre for Functional Magnetic Resonance
-    Imaging of the Brain), Department of Clinical Neurology, Oxford
-    University, Oxford, UK
-    
-    
-    LICENCE
-    
-    FMRIB Software Library, Release 5.0 (c) 2012, The University of
-    Oxford (the "Software")
-    
-    The Software remains the property of the University of Oxford ("the
-    University").
-    
-    The Software is distributed "AS IS" under this Licence solely for
-    non-commercial use in the hope that it will be useful, but in order
-    that the University as a charitable foundation protects its assets for
-    the benefit of its educational and research purposes, the University
-    makes clear that no condition is made or to be implied, nor is any
-    warranty given or to be implied, as to the accuracy of the Software,
-    or that it will be suitable for any particular purpose or for use
-    under any specific conditions. Furthermore, the University disclaims
-    all responsibility for the use which is made of the Software. It
-    further disclaims any liability for the outcomes arising from using
-    the Software.
-    
-    The Licensee agrees to indemnify the University and hold the
-    University harmless from and against any and all claims, damages and
-    liabilities asserted by third parties (including claims for
-    negligence) which arise directly or indirectly from the use of the
-    Software or the sale of any products based on the Software.
-    
-    No part of the Software may be reproduced, modified, transmitted or
-    transferred in any form or by any means, electronic or mechanical,
-    without the express permission of the University. The permission of
-    the University is not required if the said reproduction, modification,
-    transmission or transference is done without financial return, the
-    conditions of this Licence are imposed upon the receiver of the
-    product, and all original and amended source code is included in any
-    transmitted product. You may be held legally responsible for any
-    copyright infringement that is caused or encouraged by your failure to
-    abide by these terms and conditions.
-    
-    You are not permitted under this Licence to use this Software
-    commercially. Use for which any financial return is received shall be
-    defined as commercial use, and includes (1) integration of all or part
-    of the source code or the Software into a product for sale or license
-    by or on behalf of Licensee to third parties or (2) use of the
-    Software or any derivative of it for research with the final aim of
-    developing software products for sale or license to a third party or
-    (3) use of the Software or any derivative of it for research with the
-    final aim of developing non-software products for sale or license to a
-    third party, or (4) use of the Software to provide any service to an
-    external organisation for which payment is received. If you are
-    interested in using the Software commercially, please contact Isis
-    Innovation Limited ("Isis"), the technology transfer company of the
-    University, to negotiate a licence. Contact details are:
-    innovation@isis.ox.ac.uk quoting reference DE/9564. */
+    Copyright (C) 2015 University of Oxford  */
+
+/*   CCOPYRIGHT   */
 
 #include "asl_functions.h"
 
@@ -476,6 +418,205 @@ namespace OXASL {
     save_volume4D(magout,fname+"_magntiude");
   }
 
+  // Function to correct PV using LR method
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel)
+  {
+
+    volume<float> submask;
+    volume<float> data_roi;
+    volume<float> pv_roi;
+    Matrix pseudo_inv;
+    Matrix pv_corr_result;
+    Matrix ha_result;
+
+    // Variables to store the boundary index of submask (ROI)
+    int x_0;
+    int x_1;
+    int y_0;
+    int y_1;
+    int z_0;
+    int z_1;
+
+    float pv_average = 0.0f;
+
+    // Get x y z dimension
+    int x = mask.xsize();
+    int y = mask.ysize();
+    int z = mask.zsize();
+
+    volume<float> gm_corr_data(x, y, z); // result matrix GM
+    //volume<float> wm_corr_data(x, y, z); // result matrix WM
+
+    // Linear regression to correct (smooth) the data
+    for (int i = 0; i < x; i++) {
+      for (int j = 0; j < y; j++) {
+        for (int k = 0; k < z; k++) {
+          // Only work with positive voxels
+          if(mask.value(i, j, k) > 0) {
+            
+            // Determine ROI boundary index
+            x_0 = max(i - kernel, 0);
+            x_1 = min(i + kernel, x - 1);
+            y_0 = max(j - kernel, 0);
+            y_1 = min(j + kernel, y - 1);
+            z_0 = max(k - kernel, 0);
+            z_1 = min(k + kernel, z - 1);
+
+            // create a submask here
+            //mask.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+            //mask.activateROI();
+            //submask = mask.ROI();
+
+            // Define three column vectors to store data and PVE of the current regression kernel
+            ColumnVector sub_mask = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            ColumnVector sub_data = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            Matrix sub_pve  = Matrix((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1), 2);
+            
+            int sub_mask_count = 0;
+            int non_zero_count = 0;
+            float submask_sum = 0.0f; // value to store the sum of current mask kernel
+            for(int p = 0; p < z_1 - z_0 + 1; p++) {
+              for(int n = 0; n < y_1 - y_0 + 1; n++) {
+                for(int m = 0; m < x_1 - x_0 + 1; m++) {
+                  //sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, first column is GM
+                  sub_pve.element(sub_mask_count, 0) = pv_map_gm.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, second column is WM
+                  sub_pve.element(sub_mask_count, 1) = pv_map_wm.value(x_0 + m, y_0 + n, z_0 + p);
+                  submask_sum = submask_sum + mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  if(mask.value(x_0 + m, y_0 + n, z_0 + p) > 0) {
+                    non_zero_count++;
+                  }
+                  sub_mask_count++;
+                }
+              }
+            }
+
+            // calculate the sum of all elements in submask
+            // proceed if sum is greater than 5 (arbitrary threshold)
+            if(submask_sum > 5) {
+              // Apply submask to the data and PVE of the current kernel
+              ColumnVector data_roi_v = ColumnVector(non_zero_count);
+              Matrix pv_roi_v = Matrix(non_zero_count, 2);
+              //RowVector pv_roi_r = RowVector(non_zero_count);
+              
+              int non_zero_index = 0;
+              // Extract all non-zero elements
+              for(int a = 0; a < sub_mask_count; a++) {
+                if(sub_mask.element(a) > 0) {
+                  data_roi_v.element(non_zero_index) = sub_data.element(a);
+                  pv_roi_v.element(non_zero_index, 0) = sub_pve.element(a, 0);
+                  pv_roi_v.element(non_zero_index, 1) = sub_pve.element(a, 1);
+                  non_zero_index++;
+                }
+                else {
+                  continue;
+                }
+              }
+
+              // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
+              // This will cause run time error
+              // So we assign the corrected result to zero in such cases
+              if(pv_roi_v.IsZero()) {
+                gm_corr_data.value(i, j, k) = 0.0f;
+                cout << "singular" << endl;
+              }
+              else {
+                // Compute pseudo inversion matrix of PV map
+                // ((P^t * P) ^ -1) * (P^t)
+                pseudo_inv = ( ( (pv_roi_v.t()) * pv_roi_v).i() ) * (pv_roi_v.t());
+
+                // Get average PV value of the current kernel
+                pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
+
+                // Calculate PV corrected data only if there is some PV compoment
+                // If there is little PV small, make it zero
+                if(pv_average >= 0.01) {
+                  pv_corr_result = pseudo_inv * data_roi_v;
+                  gm_corr_data.value(i, j, k) = pv_corr_result.element(0, 0); // output GM only
+                  //corr_data.value(i, j, k) = pv_corr_result.element(1, 0);
+                }
+                else {
+                  gm_corr_data.value(i, j, k) = 0.0f;
+                }
+
+              }
+            }
+
+            else {
+            } // end submask
+
+          }
+
+          else{
+            // do nothing at the moment
+          } // end mask
+
+        }
+      }
+    }
+
+    return gm_corr_data;
+
+  } // End function correct_pv_lr
+
+  // Function to correct NaN values
+  volume<float> correct_NaN(const volume<float>& data_in) {
+
+    // Clone the input data to output data
+    volume<float> data_out = data_in;
+
+    for(int i = 0; i < data_in.xsize(); i++) {
+      for(int j = 0; j < data_in.ysize(); j++) {
+        for(int k = 0; k < data_in.zsize(); k++) {
+          // IEEE standard: comparison between NaN values is always false
+          // i.e. NaN == NaN is false
+          // In this case, we set it to zero
+          if(data_in.value(i, j, k) != data_in.value(i, j, k)) {
+            data_out.value(i, j, k) = 0.0f;
+          }
+          else {
+            continue;
+          }
+        }
+      }
+    }
+
+    return data_out;
+
+  }
+
+
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr) {
+
+    // Version control
+    cout << "PV correction by linear regression. version 1.0.2 (beta). Last compiled on 20151013" << endl;
+    
+    // Clone input data to pv corrected data
+    data_pvcorr = data_in;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    volume<float> pv_map_gm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
+    volume<float> pv_map_wm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
+    mask_in_corr   = correct_NaN(mask);
+    pv_map_gm_in_corr = correct_NaN(pv_map_gm);
+    pv_map_wm_in_corr = correct_NaN(pv_map_wm);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> corrected_data_ti = correct_NaN(data_in[i]);
+
+      // Linear regression PV correction
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_gm_in_corr, pv_map_wm_in_corr, kernel);
+    }
+  }
 
 
 }
