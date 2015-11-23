@@ -76,7 +76,9 @@ int main(int argc, char *argv[])
 
     //load data
     volume4D<float> data;
-    read_volume4D(data,opts.datafile.value());
+    if(!opts.par_rec_to_nifti_option.value()) {
+      read_volume4D(data,opts.datafile.value());
+    }
 
 
     // Partail volume correction variables
@@ -90,6 +92,35 @@ int main(int argc, char *argv[])
       read_volume(pv_wm_map, opts.pv_wm_file.value());
       kernel = opts.kernel.value();
     }
+
+    // PAR REC to Nifti file conversion variables
+    string file_type_par = ".PAR";
+    string file_type_rec = ".REC";
+    string file_par;
+    string file_rec;
+
+    int x_dim = 64, y_dim = 64, z_dim = 15; // ASL file single repeat
+    int phases = 7; // total number of phases
+    int shifts = 2; // whether increasing sampling rate
+    int repeats = 1; // total number of repeats in each TI (cardiac phase)
+    int tc_pairs = 2; // tag-control pairs
+    int tis = 11; // total number of TIs in each phase, this is represented by cardiac phase in PAR file
+    int t_dim = tis * phases * shifts * repeats * tc_pairs;
+    //int x_dim = 288, y_dim = 288, z_dim = 245, t_dim = 1; // Structure file
+    volume4D<float> data_nifti(x_dim, y_dim, z_dim, t_dim);
+    volume<float> mask_nifti(x_dim, y_dim, z_dim);
+
+    //string file_path_full;
+    if(opts.par_rec_to_nifti_option.value()) {
+      // File name manipulation
+      file_par = opts.datafile.value() + file_type_par;
+      file_rec = opts.datafile.value() + file_type_rec;
+
+    }
+    else {
+      // do nothing at the moment
+    }
+
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -245,6 +276,30 @@ int main(int argc, char *argv[])
         else {
           throw Exception("Halt!");
         }
+      }
+
+      // PAR REC to NifTI file conversion
+      if(opts.par_rec_to_nifti_option.value()) {
+        cout << "PAR file is " + file_par << endl;
+        cout << "REC file is " + file_rec << endl;
+        cout << "Start file conversion..." << endl;
+
+        // Make a default mask
+        create_default_mask(mask_nifti);
+        // Make a default nifti file
+        create_default_data_nifti(data_nifti);
+        // Start file conversion
+        convert_par_rec_to_nifti(file_par, file_rec, mask_nifti, data_nifti);
+
+        //covert data_pvcorr to vector<Matrix> aka stdform 
+        Matrix data_pvcorr_mtx;
+        vector<Matrix> asldataout_pvcorr;
+        data_pvcorr_mtx = data_nifti.matrix(mask_nifti);
+        ndata = data_nifti.tsize();
+        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+        asldataout = asldataout_pvcorr;
+        mask = mask_nifti;
+
       }
 
       //output data
