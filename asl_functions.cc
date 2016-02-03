@@ -429,6 +429,8 @@ namespace OXASL {
     Matrix pv_corr_result;
     Matrix ha_result;
 
+    int singular_matrix_flag = -1;
+
     // Variables to store the boundary index of submask (ROI)
     int x_0;
     int x_1;
@@ -453,7 +455,7 @@ namespace OXASL {
         for (int k = 0; k < z; k++) {
           // Only work with positive voxels
           if(mask.value(i, j, k) > 0) {
-            
+
             // Determine ROI boundary index
             x_0 = max(i - kernel, 0);
             x_1 = min(i + kernel, x - 1);
@@ -506,6 +508,7 @@ namespace OXASL {
               
               int non_zero_index = 0;
               // Extract all non-zero elements
+              //cout << sub_mask_count << endl;
               for(int a = 0; a < sub_mask_count; a++) {
                 if(sub_mask.element(a) > 0) {
                   data_roi_v.element(non_zero_index) = sub_data.element(a);
@@ -521,15 +524,21 @@ namespace OXASL {
               // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
               // This will cause run time error
               // So we assign the corrected result to zero in such cases
-              if(pv_roi_v.IsZero()) {
+              float det = ((pv_roi_v.t()) * pv_roi_v).Determinant();
+              if( (det <= 0.00001) && (det >= 0) ) {
                 gm_corr_data.value(i, j, k) = 0.0f;
-                cout << "singular" << endl;
+                singular_matrix_flag = 0;
+                //cout << i << ", " << j << ", " << k << endl;
+                //cout << "singular" << endl;
+                //getchar();
               }
               else {
                 // Compute pseudo inversion matrix of PV map
                 // ((P^t * P) ^ -1) * (P^t)
+                //float haha = ((pv_roi_v.t()) * pv_roi_v).Determinant();
+                //cout << ((pv_roi_v.t()) * pv_roi_v).Determinant() << endl;
                 pseudo_inv = ( ( (pv_roi_v.t()) * pv_roi_v).i() ) * (pv_roi_v.t());
-
+                //cout << i << ", " << j << ", " << k << endl;
                 // Get average PV value of the current kernel
                 pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
 
@@ -558,6 +567,10 @@ namespace OXASL {
 
         }
       }
+    }
+
+    if(singular_matrix_flag == 0) {
+      cout << "Caution: singular matrix found in PV Correction. This usually happens to data from Siemens. No action required." << endl;
     }
 
     return gm_corr_data;
@@ -595,7 +608,7 @@ namespace OXASL {
   void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr) {
 
     // Version control
-    cout << "PV correction by linear regression. version 1.0.3 (beta). Last compiled on 20151113" << endl;
+    cout << "PV correction by linear regression. version 1.0.4 (beta). Last compiled on 20160203" << endl;
     
     // Clone input data to pv corrected data
     data_pvcorr = data_in;
@@ -677,8 +690,8 @@ namespace OXASL {
     int label_type; // imagekey, for ASL. 1=control; 2=label
 
     // start file handling
-    ifstream par_file(file_par_name);
-    ifstream rec_file(file_rec_name, ifstream::binary);
+    ifstream par_file(file_par_name.c_str());
+    ifstream rec_file(file_rec_name.c_str(), ifstream::binary);
     int read_counter = 0;
 
     int x_y_dimension = data_nifti.xsize();
@@ -686,10 +699,14 @@ namespace OXASL {
     float voxel_floating_point_value[x_y_dimension * x_y_dimension];
 
     // define a temporary matrix [x][y][z][dynamics (phases)][cardiac phases (TIs)][ASL (value: 1 control; 2 control)]
-    int x_dim = 64, y_dim = 64, z_dim = 15, dynamics = 7, shift = 2, repeats = 1, tis = 11, asl = 2; // ASL file
+    //int x_dim = 64, y_dim = 64, z_dim = 15, dynamics = 7, shift = 2, repeats = 1, tis = 11, asl = 2; // ASL file
+    int x_dim = 64, y_dim = 64, z_dim = 15, dynamics = 7, shift = 2, repeats = 2, tis = 11, asl = 2; // ASL file
     //int x_dim = 288, y_dim = 288, z_dim = 245, dynamics = 1, shift = 1, repeats = 1, tis = 1, asl = 1; // Structure file
 
-    static float temp_data[64][64][15][7 * 2 * 1][11][2];
+    // Display dimension of the output file
+    cout << "x: " << x_dim << " y: " << y_dim << " z: " << z_dim << " t: " << dynamics * shift * repeats * tis * asl << endl;
+
+    static float temp_data[64][64][15][7 * 2 * 2][11][2];
     //static float temp_data[288][288][245][1][1][1];
     //static float temp_data_2[64][64][15][7][11 * 2][2]; // ASL file array
     //int structural_image_flag = 1;
@@ -746,6 +763,9 @@ namespace OXASL {
             //getchar();
           }
 
+          // Variable to deal with converting float to strings
+          ostringstream str_buff;
+
           // Now current_line_data saves each number in the current line in floating point format
           slice_number                = (int) current_line_data[0];
           echo_number                 = (int) current_line_data[1];
@@ -790,8 +810,12 @@ namespace OXASL {
           inversion_delay             = current_line_data[40]; // in ms
           diffusion_b_value_number    = (int) current_line_data[41]; // imagekey!
           gradient_orientation_number = (int) current_line_data[42]; // imagekey!
-          constrast_type              = to_string(current_line_data[43]);
-          diffusion_anisotropy_type   = to_string(current_line_data[44]);
+          str_buff << current_line_data[43];
+          constrast_type              = str_buff.str();
+          str_buff << current_line_data[44];
+          diffusion_anisotropy_type   = str_buff.str();
+          //constrast_type              = to_string(current_line_data[43]);
+          //diffusion_anisotropy_type   = to_string(current_line_data[44]);
           diffusion_ap                = current_line_data[45];
           diffusion_fh                = current_line_data[46];
           diffusion_rl                = current_line_data[47];

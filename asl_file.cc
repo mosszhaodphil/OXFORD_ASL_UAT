@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     int x_dim = 64, y_dim = 64, z_dim = 15; // ASL file single repeat
     int phases = 7; // total number of phases
     int shifts = 2; // whether increasing sampling rate
-    int repeats = 1; // total number of repeats in each TI (cardiac phase)
+    int repeats = 2; // total number of repeats in each TI (cardiac phase)
     int tc_pairs = 2; // tag-control pairs
     int tis = 11; // total number of TIs in each phase, this is represented by cardiac phase in PAR file
     int t_dim = tis * phases * shifts * repeats * tc_pairs;
@@ -115,6 +115,9 @@ int main(int argc, char *argv[])
       // File name manipulation
       file_par = opts.datafile.value() + file_type_par;
       file_rec = opts.datafile.value() + file_type_rec;
+
+      // Display dimension of the output file
+      cout << "x: " << x_dim << " y: " << y_dim << " z: " << z_dim << " t: " << t_dim << endl;
 
     }
     else {

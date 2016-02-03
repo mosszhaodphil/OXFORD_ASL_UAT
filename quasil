@@ -23,6 +23,12 @@ Usage() {
     echo " --infertau : estimate bolus duration from data"
     echo " --mfree    : Do model-free (SVD deconvolution) analysis"
     echo ""
+    echo " Partial volume effects correction options:"
+    echo " --pvcorr   : Set partial volume effect correction on. If no PV maps or structural images are provided, PV maps will be estimated using T1 image"
+    echo " --pvgm     : GM PV map"
+    echo " --pvwm     : WM PV map"
+    echo " --s        : sturctural image to estimate PV maps"
+    echo ""
     echo " Sequence parameters:"
     echo " --slicedt  : Set the increase in TI with slice {default: 0.035 s}"
     echo " --fa       : Flip angle for LL readout {default: 35 degrees}"
@@ -317,9 +323,12 @@ if [ ! -z $pvcorr ]; then
             # downsample the PVE
 	        ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear
 	        ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear
+            #${FSLDIR}/bin/applywarp -i T1highres_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear
             #${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvcsf -s --interp=trilinear #not currently used but here for future use
-	        pvgm=pvgm
+	        
+            pvgm=pvgm
 	        pvwm=pvwm
+            #pvcsf=pvcsf
 
         else # if structural image is provided, register it with ASL T1 image and then do tissue segmentation
             echo "Extracting PVE from structural image"
@@ -327,17 +336,22 @@ if [ ! -z $pvcorr ]; then
             ${FSLDIR}/bin/bet $stdir/$strim brain 
 
             # registration
-            ${FSLDIR}/bin/flirt -dof 6 -in brain -ref calib/T1t -out str_t1_reg
+            ${FSLDIR}/bin/flirt -dof 6 -in calib/T1t -ref brain -out str_t1_reg  -omat T1t_to_str.mat
+
+            # Compute the inverse of registration matrix for downsampling use
+            ${FSLDIR}/bin/convert_xfm -omat T1t_to_str_inverse.mat -inverse T1t_to_str.mat
 
             # tissue segmentation
             ${FSLDIR}/bin/fast -p str_t1_reg
 
             # downsample to ASL space
-            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_1 -r calib/T1t -o pvgm -s --interp=trilinear
-            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_2 -r calib/T1t -o pvwm -s --interp=trilinear
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            #${FSLDIR}/bin/applywarp -i str_t1_reg_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear --premat=T1t_to_str_inverse.mat
 
             pvgm=pvgm
             pvwm=pvwm
+            #pvcsf=pvcsf
 
         fi
     else
@@ -352,6 +366,9 @@ if [ ! -z $pvcorr ]; then
     # general tidying up of PVE images
     ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 pvgm
     ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 pvwm
+    # Do not remove the low PVE voxels - Moss
+    #${FSLDIR}/bin/fslmaths $pvgm -thr 0 -min 1 pvgm
+    #${FSLDIR}/bin/fslmaths $pvwm -thr 0 -min 1 pvwm
     ${FSLDIR}/bin/fslmaths pvgm -bin gm_mask
     ${FSLDIR}/bin/fslmaths pvwm -bin wm_mask
 
@@ -368,6 +385,12 @@ if [ ! -z $pvcorr ]; then
     #${FSLDIR}/bin/imcp pv_mask $stdir/$outdir/pv_mask
 fi
 
+# blur the image
+#${FSLDIR}/bin/fslmaths asldata -s 5 asldata
+#${FSLDIR}/bin/fslmaths pvgm -s 10 -mas pvgm pvgm
+#${FSLDIR}/bin/fslmaths pvwm -s 10 -mas pvwm pvwm
+# Erode the mask
+#${FSLDIR}/bin/fslmaths mask -ero mask
 
 #if [ 1 -eq 0 ]; then
 
@@ -458,9 +481,9 @@ echo "Begin model-based analysis"
     if [ -z $pvcorr ]; then
 	fslmaths $tempdir/full/mean_ftiss $cinstr -mul 6000 $outdir/perfusion
     else
-	fslmaths $tempdir/full/mean_ftiss $cinstr -mul 6000 -mas $tempdir/gm_mask $outdir/perfusion
+	fslmaths $tempdir/full/mean_ftiss $cinstr -mul 6000 -mas $tempdir/gm_mask $outdir/perfusion_gm
     fi
-    fslmaths $tempdir/full/mean_ftiss $outdir/perfusion_raw 
+    fslmaths $tempdir/full/mean_ftiss $outdir/perfusion_raw
     imcp $tempdir/full/mean_delttiss $outdir/arrival
     fslmaths $tempdir/full/mean_fblood $cinstr $outdir/aCBV
     if [ ! -z $infertau ]; then
