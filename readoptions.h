@@ -60,6 +60,10 @@ public:
   Option<string> pv_wm_file;
   Option<int> kernel;
 
+  // Covert PAR REC file to nifty format
+  Option<bool> par_rec_to_nifti_option;
+  //Option<string> par_rec_file_name; // file name for both PAR and REC (suppose they should have the same file name)
+
   void parse_command_line(int argc, char** argv);
 
 private:
@@ -159,10 +163,14 @@ help(string("-h,--help"), false,
       false, requires_argument),
     pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
       false, requires_argument),
-    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5"),
+    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
       false, requires_argument),
 
-
+    // Covert PAR REC file to nifty format
+    par_rec_to_nifti_option(string("--parrec2nifti"), false, 
+      string("Option to convert PAR REC file to NIfTI format"), 
+      false, no_argument),
+    //par_rec_file_name(string("--parrec"), string(""), string("PAR REC file name without file type (assume they have the same file name)"), false, requires_argument),
 
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
       try {
@@ -196,6 +204,9 @@ help(string("-h,--help"), false,
        options.add(pv_gm_file);
        options.add(pv_wm_file);
        options.add(kernel);
+
+       options.add(par_rec_to_nifti_option);
+       //options.add(par_rec_file_name);
 
      }
 
