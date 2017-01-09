@@ -110,6 +110,16 @@ int main(int argc, char *argv[])
     volume4D<float> data_nifti(x_dim, y_dim, z_dim, t_dim);
     volume<float> mask_nifti(x_dim, y_dim, z_dim);
 
+    // Extrapolation variables
+    volume4D<float> data_extrapolated(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    // Extrapolation options
+    int neighbour_size;
+    if (opts.extrapolate_option.value()) {
+      // Get the neighbourhood size
+      neighbour_size = opts.neighbour.value();
+      //cout << neighbour_size << endl;
+    }
+
     //string file_path_full;
     if(opts.par_rec_to_nifti_option.value()) {
       // File name manipulation
@@ -169,44 +179,46 @@ int main(int argc, char *argv[])
     // int idx;
     
     if (opts.splitpairs.value() && opts.tcdiff.value()) {
-	// doesn't make sense to try and do both splitpairs and tcdifference
-	throw Exception("Cannot both split the pairs and difference them");
-      }
-
-
-  if (opts.splitpairs.value()) {
-    // need to split the data here if plit pairs has been requested
-      separatepairs(asldata,asldataodd,asldataeven);
+    	// doesn't make sense to try and do both splitpairs and tcdifference
+    	throw Exception("Cannot both split the pairs and difference them");
     }
 
-      //tag control difference
-      if (opts.tcdiff.value()) {
-	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
-	//overwrite asldata with differenced data
-	for (int ti=0; ti<ntis; ti++) {
-	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
-	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
-	}
-	outpairs=false;
 
-
-	/*	for (int ti=0; ti<ntis; ti++) {
-	  Matrix oddmtx;
-	  oddmtx = asldata[ti].Row(1);
-	  Matrix evenmtx;
-	  evenmtx = asldata[ti].Row(2);
-	  for (int r=2; r<=nrpts; r++) {
-	    idx=(r-1)*2+1;
-	    oddmtx &= asldata[ti].Row(idx);
-	    evenmtx &= asldata[ti].Row(idx+1);
-	  }
-	  
-	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
-	  asldata[ti] = diffmtx;
-	  outpairs=false;
-	}
-	*/
+    if (opts.splitpairs.value()) {
+      // need to split the data here if plit pairs has been requested
+        separatepairs(asldata,asldataodd,asldataeven);
       }
+
+    //tag control difference
+    if (opts.tcdiff.value()) {
+    	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    	//overwrite asldata with differenced data
+    	for (int ti=0; ti<ntis; ti++) {
+    	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
+    	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    	}
+    	outpairs=false;
+
+
+    	/*	for (int ti=0; ti<ntis; ti++) {
+    	  Matrix oddmtx;
+    	  oddmtx = asldata[ti].Row(1);
+    	  Matrix evenmtx;
+    	  evenmtx = asldata[ti].Row(2);
+    	  for (int r=2; r<=nrpts; r++) {
+    	    idx=(r-1)*2+1;
+    	    oddmtx &= asldata[ti].Row(idx);
+    	    evenmtx &= asldata[ti].Row(idx+1);
+    	  }
+    	  
+    	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
+    	  asldata[ti] = diffmtx;
+    	  outpairs=false;
+    	}
+    	*/
+    }
+
+
 
 
     vector<Matrix> asldataout; //the data we are about to use for output purposes
@@ -305,13 +317,40 @@ int main(int argc, char *argv[])
 
       }
 
+      // Extrapolation options
+      if (opts.extrapolate_option.value()) {
+        // Check mask and input file
+        if(opts.maskfile.set()) {
+          cout << "Start extrapolation!" << endl;
+
+          // Define a matrix 
+          Matrix aslmatrix_non_extrapolated;
+          volume4D<float> asldata_non_extrapolated;
+          stdform2data(asldataout, aslmatrix_non_extrapolated, outblocked, outpairs);
+          asldata_non_extrapolated.setmatrix(aslmatrix_non_extrapolated, mask);
+
+          // Perform extrapolation
+          extrapolate(asldata_non_extrapolated, ndata, mask, neighbour_size, data_extrapolated);
+
+          Matrix data_extrapolated_mtx;
+          vector<Matrix> asldataout_extrapolated;
+          data_extrapolated_mtx = data_extrapolated.matrix(mask);
+          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, isblocked, ispairs);
+          asldataout = asldataout_extrapolated;
+        }
+
+        else {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+      }
+
       //output data
       if (opts.out.set()) {
-	Matrix outmtx;
-	volume4D<float> dataout;
-	stdform2data(asldataout,outmtx,outblocked,outpairs);
-	dataout.setmatrix(outmtx,mask);
-	save_volume4D(dataout,opts.out.value()+fsub);
+      	Matrix outmtx;
+      	volume4D<float> dataout;
+      	stdform2data(asldataout,outmtx,outblocked,outpairs);
+      	dataout.setmatrix(outmtx,mask);
+      	save_volume4D(dataout,opts.out.value()+fsub);
       }
 
       //take mean at each TI

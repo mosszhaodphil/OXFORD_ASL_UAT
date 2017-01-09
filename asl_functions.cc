@@ -944,4 +944,147 @@ namespace OXASL {
 
   }
 
+  Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size) {
+
+    // Here we use a spiral search to find the voxels to be extrapolated
+    // http://stackoverflow.com/questions/398299/looping-in-a-spiral
+
+    Matrix data_extrapolated = data_in;
+
+    int x = data_in.Ncols();
+    int y = data_in.Nrows();
+
+    int x_index = 0;
+    int y_index = 0;
+    int dx = 0;
+    int dy = -1;
+
+    int x_boundary = x - 1;
+    int y_boundary = y - 1;
+    int x_offset = x / 2;
+    int y_offset = y / 2;
+
+    int t = max(x_boundary, y_boundary);
+    int max_i = t * t;
+
+    int count = 1;
+
+    for (int i = 0; i < max_i; i++) {
+
+      // Position found
+      if ( (-x_boundary / 2 <= x_index) && (x_index <= x_boundary / 2) && (-1 * y_boundary / 2 <= y_index) && (y_index <= y_boundary / 2)) {
+        //cout << x_index << ", " << y_index << endl;
+
+        // Do extrapolation
+        int x_index_on_matrix = x_index + x_offset;
+        int y_index_on_matrix = y_index + y_offset;
+
+        // Only work on eroded voxels
+        if (mask_in.element(x_index_on_matrix, y_index_on_matrix) != 0 && data_in.element(x_index_on_matrix, y_index_on_matrix) == 0 ){
+          // Create a square matrix of size neighbourhood and centered at the current postion
+          int off_set = floor(neighbour_size / 2);
+
+          int column_begin = x_index_on_matrix - off_set;
+          int column_end = x_index_on_matrix + off_set;
+
+          int row_begin = y_index_on_matrix - off_set;
+          int row_end = y_index_on_matrix + off_set;
+
+          // If it is out of boundary then continue
+          if (column_begin <= 0 || column_end <= 0 || row_begin <= 0 || row_end <= 0) {
+            continue;
+          }
+
+          float sum = 0;
+          int non_zero_count = 0;
+
+          for (int m = column_begin; m <= column_end; m++) {
+            for (int n = row_begin; n <= row_end; n++) {
+              if (data_in.element(m, n) != 0) {
+                sum = sum + data_in.element(m, n);
+                non_zero_count++;
+              }
+            }
+          }
+
+          if(non_zero_count > 0) {
+            data_extrapolated.element(x_index_on_matrix, y_index_on_matrix) = sum / non_zero_count;
+          }
+
+        }
+
+      }
+
+      if( (x_index == y_index) || ((x_index < 0) && (x_index == (-1) * y_index)) || ((x_index > 0) && (x_index == 1 - y_index))  ) {
+        t = dx;
+        dx = -1 * dy;
+        dy = t;
+      }
+
+      x_index = x_index + dx;
+      y_index = y_index + dy;
+    }
+
+    return data_extrapolated;
+
+  }
+
+  // Function to extrapolate voxels
+  void extrapolate(const volume4D<float>& data, int ndata_in, const volume<float>& mask, int neighbour_size, volume4D<float>& data_extrapolated) {
+
+    // Version control
+    cout << "Extrapolation. version 1.0.1 (beta). Last compiled on 20161029" << endl;
+    
+    // Clone input data to the result data
+    data_extrapolated = data;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    mask_in_corr = correct_NaN(mask);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> nan_corrected_data_ti = correct_NaN(data[i]);
+
+      // Define a temporary matrix to save current extrapolated results
+      volume<float> extrapolated_data_3D(mask.xsize(), mask.ysize(), mask.zsize());
+
+      // Get x y z dimension
+      int x = nan_corrected_data_ti.xsize();
+      int y = nan_corrected_data_ti.ysize();
+      int z = nan_corrected_data_ti.zsize();
+
+      // for each slice, perform extrapolation
+      for(int j = 0; j < z; j++) {
+        Matrix data_slice_non_extrapolated = Matrix(x, y);
+        Matrix data_slice_extrapolated = Matrix(x, y);
+        Matrix data_mask = Matrix(x, y);
+
+        // Copy the current slice to non-extrapolated matrix
+        for(int m = 0; m < x; m++) {
+          for(int n = 0; n < y; n++) {
+            data_slice_non_extrapolated.element(m, n) = nan_corrected_data_ti.value(m, n, j);
+            data_mask.element(m, n) = mask_in_corr.value(m, n, j);
+            // Default value for the extrapolated matrix is the same with the input file
+            data_slice_extrapolated.element(m, n) = nan_corrected_data_ti.value(m, n, j);
+          }
+        }
+
+        data_slice_extrapolated = extrapolate_avg(data_slice_non_extrapolated, data_mask, neighbour_size);
+
+        // Assign the extrapolated matrix to the 3D volume
+        for(int m = 0; m < x; m++) {
+          for(int n = 0; n < y; n++) {
+           extrapolated_data_3D.value(m, n, j) = data_slice_extrapolated.element(m, n);
+          }
+        }
+
+      }
+
+      // Assign result to the 4D volume
+      data_extrapolated[i] = extrapolated_data_3D;
+    }
+  }
+
 }

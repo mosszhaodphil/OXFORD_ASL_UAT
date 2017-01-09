@@ -64,6 +64,11 @@ public:
   Option<bool> par_rec_to_nifti_option;
   //Option<string> par_rec_file_name; // file name for both PAR and REC (suppose they should have the same file name)
 
+  // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+  // Assumes an eroded brain
+  Option<bool> extrapolate_option;
+  Option<int> neighbour;
+
   void parse_command_line(int argc, char** argv);
 
 private:
@@ -168,9 +173,17 @@ help(string("-h,--help"), false,
 
     // Covert PAR REC file to nifty format
     par_rec_to_nifti_option(string("--parrec2nifti"), false, 
-      string("Option to convert PAR REC file to NIfTI format"), 
+      string("Option to convert PAR REC file to NIfTI format\n"), 
       false, no_argument),
     //par_rec_file_name(string("--parrec"), string(""), string("PAR REC file name without file type (assume they have the same file name)"), false, requires_argument),
+
+    // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+    // Assumes an eroded brain
+    extrapolate_option(string("--extrapolate"), false, 
+      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
+      false, no_argument),
+    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
 
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
       try {
@@ -207,6 +220,9 @@ help(string("-h,--help"), false,
 
        options.add(par_rec_to_nifti_option);
        //options.add(par_rec_file_name);
+
+       options.add(extrapolate_option);
+       options.add(neighbour);
 
      }
 
